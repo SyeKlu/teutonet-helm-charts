@@ -29,34 +29,87 @@ spec:
       containers:
         - name: {{ printf "%s-%s" .Chart.Name $name }}
           env:
+            - name: CKAN_SITE_ID
+              value: {{ .Values.ckan.siteId }}
+            - name: CKAN_SITE_TITLE
+              value: {{ .Values.ckan.siteTitle | quote }}
+            {{- if .Values.ckan.ingress.host }}
+            - name: CKAN_SITE_URL
+              value: "https://{{ .Values.ckan.ingress.host }}"
+            {{- end }}
+            - name: CKAN_SYSADMIN_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-%s-config" (include "common.names.fullname" $) $name }}
+                  key: sysAdminUsername
+            - name: CKAN_SYSADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-%s-config" (include "common.names.fullname" $) $name }}
+                  key: sysAdminPassword
+            - name: CKAN_SYSADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-%s-config" (include "common.names.fullname" $) $name }}
+                  key: sysAdminEmail
+            {{- if .Values.ckan.smtp }}
+            - name: CKAN_SMTP_SERVER
+              value: {{ .Values.ckan.smtp.server }}
+            - name: CKAN_SMTP_USER
+              value: {{ .Values.ckan.smtp.user }}
+            - name: CKAN_SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-%s-config" (include "common.names.fullname" $) $name }}
+                  key: smtpPassword
+            - name: CKAN_SMTP_MAIL_FROM
+              value: {{ .Values.ckan.smtp.mailFrom }}
+            - name: CKAN_SMTP_TLS
+              value: {{ .Values.ckan.smtp.tls }}
+            - name: CKAN_SMTP_STARTTLS
+              value: {{ .Values.ckan.smtp.starttls | quote}}
+            {{- end }}
             - name: POSTGRES_USER
               value: postgres
             - name: POSTGRES_PASSWORD
-              value: {{ .Values.postgresql.auth.postgresPassword }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-%s-config" (include "common.names.fullname" $) $name }}
+                  key: postgresUsername
             - name: POSTGRES_DB
               value: postgres
             - name: POSTGRES_HOST
               value: {{ printf "%s-%s" (include "common.names.fullname" $) "postgresql" }}
             - name: CKAN_DB_USER
-              value: {{ .Values.postgresql.auth.username }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-%s-config" (include "common.names.fullname" $) $name }}
+                  key: ckanDatabaseUsername
             - name: CKAN_DB_PASSWORD
-              value: {{ .Values.postgresql.auth.password }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-%s-config" (include "common.names.fullname" $) $name }}
+                  key: ckanDatabasePassword
             - name: CKAN_DB
               value: {{ .Values.postgresql.auth.database }}
             - name: DATASTORE_READONLY_USER
-              value: {{ .Values.postgresql.auth.datastoreUsername }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-%s-config" (include "common.names.fullname" $) $name }}
+                  key: datastoreUsername
             - name: DATASTORE_READONLY_PASSWORD
-              value: {{ .Values.postgresql.auth.datastorePassword }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ printf "%s-%s-config" (include "common.names.fullname" $) $name }}
+                  key: datastorePassword
             - name: DATASTORE_DB
-              value: {{ .Values.postgresql.auth.datastoreDb }}
+              value: {{ .Values.postgresql.ckanDbs.datastoreDb }}
             - name: CKAN_SQLALCHEMY_URL
               value: "postgresql://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ printf "%s-%s" (include "common.names.fullname" $) "postgresql" }}/{{ .Values.postgresql.auth.database}}"
             - name: CKAN_DATASTORE_WRITE_URL
               value: "postgresql://{{ .Values.postgresql.auth.username }}:{{ .Values.postgresql.auth.password }}@{{ printf "%s-%s" (include "common.names.fullname" $) "postgresql" }}/{{ .Values.postgresql.auth.datastoreDb}}"
             - name: CKAN_DATASTORE_READ_URL
               value: "postgresql://{{ .Values.postgresql.auth.datastoreUsername }}:{{ .Values.postgresql.auth.datastorePassword }}@{{ printf "%s-%s" (include "common.names.fullname" $) "postgresql" }}/{{ .Values.postgresql.auth.datastoreDb}}"
-            - name: CKAN_SITE_ID
-              value: default
             - name: CKAN_SOLR_URL
               value: "http://{{ printf "%s-%s" (include "common.names.fullname" $) "solr-headles" }}:{{ include "ckan.solr.service.port" $ }}/solr/ckan"
             - name: CKAN_SOLR_USER
@@ -71,17 +124,11 @@ spec:
               value: "http://{{ printf "%s-%s" (include "common.names.fullname" $) "ckan" }}:{{ include "ckan.ckan.service.port" $ }}"
             - name: CKAN_PLUGINS
               value: "envvars image_view text_view recline_view datastore datapusher"
-            - name: CKAN_SYSADMIN_NAME
-              value: {{ .Values.ckan.sysadmin.name }}
-            - name: CKAN_SYSADMIN_PASSWORD
-              value: {{ .Values.ckan.sysadmin.password }}
-            - name: CKAN_SYSADMIN_EMAIL
-              value: {{ .Values.ckan.sysadmin.email }}
           image: {{ include "common.images.image" (dict "imageRoot" .Values.ckan.image "global" .Values.global) }}
           imagePullPolicy: {{ .Values.ckan.image.pullPolicy }}
           volumeMounts:
             - name: "ckan"
-              mountPath: {{ .Values.ckan.storagePath }}
+              mountPath: /var/lib/ckan/default
               readOnly: false
           ports:
             - name: http
@@ -89,3 +136,7 @@ spec:
               protocol: TCP
           resources:
             {{- toYaml .Values.ckan.resources | nindent 12 }}
+
+#TODO Email notification
+#TODO Security context
+#TODO Security options
